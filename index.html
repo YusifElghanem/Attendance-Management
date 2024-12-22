@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -7,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-cover bg-center" style="background-image: url('images/academy_logo.png');">
+<body class="bg-cover bg-center" style="background-image: url('https://placehold.co/1920x1080?text=Sports+Academy+Logo&bg=000000&fc=ffffff');">
 
     <div class="container mx-auto p-4 sm:p-6 bg-black bg-opacity-80 rounded-lg shadow-lg text-white text-opacity-85">
         <h1 class="text-2xl sm:text-3xl font-bold text-center text-blue-800 mb-4 sm:mb-6">Sports Academy Attendance Management</h1>
@@ -50,7 +51,7 @@
                 <thead>
                     <tr class="bg-blue-800">
                         <th class="p-2 border border-gray-700">Player ID</th>
-                        <th class="p-2 border border-gray-700">Player Name</th>
+                        <th class="p-2 border border-gray-700">Player Name (Paid Status)</th>
                         <th class="p-2 border border-gray-700">Coach</th>
                         <th class="p-2 border border-gray-700">Training Level</th>
                         <th class="p-2 border border-gray-700">Date</th>
@@ -89,13 +90,12 @@
     <!-- JavaScript for Data and Logic -->
     <script>
         const players = [
-            { id: 1, name: "John Doe", level: "Intermediate" },
-            { id: 2, name: "Jane Smith", level: "Advanced" },
-            { id: 3, name: "Michael Johnson", level: "Beginner" },
-            { id: 4, name: "Sarah Parker", level: "Intermediate" },
-            { id: 5, name: "James Williams", level: "Advanced" }
+            { id: 1, name: "John Doe", level: "Intermediate", paid: true },
+            { id: 2, name: "Jane Smith", level: "Advanced", paid: false },
+            { id: 3, name: "Michael Johnson", level: "Beginner", paid: true },
+            { id: 4, name: "Sarah Parker", level: "Intermediate", paid: false },
+            { id: 5, name: "James Williams", level: "Advanced", paid: true }
         ];
-
         const coaches = [
             { id: 1, name: "Robert Brown", title: "Head Coach" },
             { id: 2, name: "Emily White", title: "Assistant Coach" },
@@ -133,7 +133,9 @@
             const player = players.find(p => p.id == searchQuery || p.name.toLowerCase().includes(searchQuery));
 
             if (player) {
-                document.getElementById("playerName").textContent = `Player: ${player.name}`;
+                // Show only ✔️ or ❌ instead of "Paid ✅" or "Not Paid ❌"
+                const paidStatus = player.paid ? "✔️" : "❌";
+                document.getElementById("playerName").textContent = `Player: ${player.name} (${paidStatus})`;
                 document.getElementById("playerLevel").textContent = `Level: ${player.level}`;
             } else {
                 alert("Player not found.");
@@ -144,37 +146,30 @@
         }
 
         function recordAttendance() {
-            const playerName = document.getElementById("playerName").textContent.replace("Player: ", "");
+            const playerName = document.getElementById("playerName").textContent.replace("Player: ", "").replace(" (✔️)", "").replace(" (❌)", "");
             if (!playerName) {
                 alert("Please search for a player first.");
                 return;
             }
 
-            const playerId = players.find(p => p.name === playerName).id;
-            const coachId = document.getElementById("coachName").value;
-            const coachName = coaches.find(c => c.id == coachId).name;
+            const player = players.find(p => p.name === playerName);
+            const playerId = player.id;
+            const paidStatus = player.paid ? '✔️' : '❌';
+            const coachName = coaches.find(c => c.id == document.getElementById("coachName").value).name;
             const trainingLevel = document.getElementById("trainingLevel").value;
             const date = new Date().toLocaleDateString();
 
-            const attendance = {
+            const attendanceRecord = {
                 playerId,
-                playerName,
+                playerName: `${playerName} (${paidStatus})`,
                 coach: coachName,
                 trainingLevel,
                 date
             };
 
-            // Check if this player already has attendance recorded for today
-            const existingRecord = attendanceRecords.find(record => record.playerId === playerId && record.date === date);
-            if (existingRecord) {
-                alert("Attendance already recorded for today.");
-                return;
-            }
-
-            attendanceRecords.push(attendance);
-            const today = new Date().setHours(0, 0, 0, 0);
-            localStorage.setItem('lastUpdated', today);
+            attendanceRecords.push(attendanceRecord);
             localStorage.setItem('attendanceRecords', JSON.stringify(attendanceRecords));
+            localStorage.setItem('lastUpdated', new Date().setHours(0, 0, 0, 0));
 
             displayAttendance();
             updateAttendanceHistory();
@@ -182,10 +177,12 @@
 
         function displayAttendance() {
             const tbody = document.getElementById("attendanceBody");
-            tbody.innerHTML = "";
+            tbody.innerHTML = "";  // Clear any previous rows
 
+            // Loop through each attendance record and display in the table
             attendanceRecords.forEach((record, index) => {
                 const row = document.createElement("tr");
+
                 row.innerHTML = `
                     <td class="p-2 border border-gray-700">${record.playerId}</td>
                     <td class="p-2 border border-gray-700">${record.playerName}</td>
@@ -196,7 +193,8 @@
                         <button class="remove-btn bg-red-600 hover:bg-red-500 text-white font-bold py-1 px-2 rounded" onclick="removeAttendance(${index})">Remove</button>
                     </td>
                 `;
-                tbody.appendChild(row);
+
+                tbody.appendChild(row);  // Add row to the table body
             });
         }
 
@@ -208,72 +206,79 @@
         }
 
         function updateAttendanceHistory() {
-            const playerHistory = {};
+            const historyTableBody = document.getElementById("historyTableBody");
+            historyTableBody.innerHTML = "";  // Clear previous history rows
 
-            attendanceRecords.forEach(record => {
-                if (!playerHistory[record.playerId]) {
-                    playerHistory[record.playerId] = { playerName: record.playerName, attendanceCount: 0 };
-                }
-                playerHistory[record.playerId].attendanceCount += 1;
+            const playerAttendanceCounts = players.map(player => {
+                const count = attendanceRecords.filter(record => record.playerId === player.id).length;
+                return { playerName: player.name, count };
             });
 
-            const tbody = document.getElementById("historyTableBody");
-            tbody.innerHTML = "";
-
-            for (const playerId in playerHistory) {
-                const record = playerHistory[playerId];
+            playerAttendanceCounts.forEach(record => {
                 const row = document.createElement("tr");
                 row.innerHTML = `
-                    <td class="p-2 border border-gray-700">${playerId}</td>
                     <td class="p-2 border border-gray-700">${record.playerName}</td>
-                    <td class="p-2 border border-gray-700">${record.attendanceCount}</td>
+                    <td class="p-2 border border-gray-700">${record.count}</td>
                 `;
-                tbody.appendChild(row);
-            }
+                historyTableBody.appendChild(row);
+            });
         }
 
         function exportToExcel() {
-            const csvRows = [
-                ["Player ID", "Player Name", "Coach", "Training Level", "Date"]
-            ];
+            const csvRows = [];
+            const headers = ["Player ID", "Player Name", "Coach", "Training Level", "Date"];
+            csvRows.push(headers.join(","));
 
             attendanceRecords.forEach(record => {
-                csvRows.push([record.playerId, record.playerName, record.coach, record.trainingLevel, record.date]);
+                const row = [
+                    record.playerId,
+                    record.playerName,
+                    record.coach,
+                    record.trainingLevel,
+                    record.date
+                ].join(",");
+                csvRows.push(row);
             });
 
-            const csvContent = csvRows.map(row => row.join(",")).join("\n");
-            const blob = new Blob([csvContent], { type: "text/csv" });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = "attendance.csv";
-            link.click();
+            const csvContent = csvRows.join("\n");
+            downloadCSV(csvContent, "attendance_records.csv");
         }
 
         function exportHistoryToExcel() {
-            const playerHistory = {};
-            attendanceRecords.forEach(record => {
-                if (!playerHistory[record.playerId]) {
-                    playerHistory[record.playerId] = { playerName: record.playerName, attendanceCount: 0 };
-                }
-                playerHistory[record.playerId].attendanceCount += 1;
+            const csvRows = [];
+            const headers = ["Player Name", "Attendance Count"];
+            csvRows.push(headers.join(","));
+
+            const playerAttendanceCounts = players.map(player => {
+                const count = attendanceRecords.filter(record => record.playerId === player.id).length;
+                return { playerName: player.name, count };
             });
 
-            const csvRows = [
-                ["Player ID", "Player Name", "Attendance Count"]
-            ];
+            playerAttendanceCounts.forEach(record => {
+                const row = [
+                    record.playerName,
+                    record.count
+                ].join(",");
+                csvRows.push(row);
+            });
 
-            for (const playerId in playerHistory) {
-                const record = playerHistory[playerId];
-                csvRows.push([playerId, record.playerName, record.attendanceCount]);
-            }
+            const csvContent = csvRows.join("\n");
+            downloadCSV(csvContent, "attendance_history.csv");
+        }
 
-            const csvContent = csvRows.map(row => row.join(",")).join("\n");
-            const blob = new Blob([csvContent], { type: "text/csv" });
+        function downloadCSV(csvContent, filename) {
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
             const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = "attendance_history.csv";
-            link.click();
+            if (link.download !== undefined) {
+                link.setAttribute("href", URL.createObjectURL(blob));
+                link.setAttribute("download", filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
         }
     </script>
+
 </body>
 </html>
