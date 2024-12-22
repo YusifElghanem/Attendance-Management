@@ -1,0 +1,75 @@
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Operator IDs</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f9;
+        color: #333;
+        padding: 20px;
+        text-align: center;
+      }
+      table {
+        width: 100%;
+        margin-top: 20px;
+        border-collapse: collapse;
+      }
+      th, td {
+        padding: 10px;
+        border: 1px solid #ddd;
+      }
+      th {
+        background-color: #007bff;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+
+    <h1>Operator IDs and Names</h1>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Operator Name</th>
+        </tr>
+      </thead>
+      <tbody id="operator-table">
+        <!-- Operator IDs will be displayed here -->
+      </tbody>
+    </table>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const operatorTable = document.getElementById('operator-table');
+
+        // Retrieve operator data from localStorage
+        const getOperatorData = () => {
+          return JSON.parse(localStorage.getItem('operatorData')) || [];
+        };
+
+        const renderOperatorData = () => {
+          const operatorData = getOperatorData();
+          operatorTable.innerHTML = '';
+
+          operatorData.forEach((data, index) => {
+            const row = operatorTable.insertRow();
+            const idCell = row.insertCell(0);
+            const nameCell = row.insertCell(1);
+
+            idCell.textContent = data.id;
+            nameCell.textContent = data.name;
+          });
+        };
+
+        // Initial render
+        renderOperatorData();
+      });
+    </script>
+
+  </body>
+  </html>
