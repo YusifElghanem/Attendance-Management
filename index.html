@@ -43,6 +43,16 @@
             </div>
         </div>
 
+        <!-- Export Buttons -->
+        <div class="flex justify-center space-x-4 mt-4">
+            <button onclick="exportAttendanceToCSV()" class="bg-green-800 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                Export Attendance Records to CSV
+            </button>
+            <button onclick="exportHistoryToCSV()" class="bg-green-800 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                Export Attendance History to CSV
+            </button>
+        </div>
+
         <!-- Attendance Table -->
         <h2 class="text-xl sm:text-2xl font-semibold text-center text-blue-800 mb-2 sm:mb-4">Attendance Records</h2>
         <div class="overflow-x-auto">
@@ -65,13 +75,15 @@
 
         <!-- Player Attendance History Table -->
         <h2 class="text-xl sm:text-2xl font-semibold text-center text-blue-800 mb-2 sm:mb-4">Your Attendance History</h2>
-        <div class="overflow-x-auto">
+        <button id="toggleHistoryBtn" onclick="toggleHistoryTable()" class="bg-blue-800 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-4">
+            Show Attendance History
+        </button>
+        <div id="historyTableContainer" class="overflow-x-auto hidden">
             <table id="historyTable" class="w-full bg-gray-800 text-white text-opacity-85 border border-gray-700">
                 <thead>
                     <tr class="bg-blue-800">
-                        <th class="p-2 border border-gray-700">Player ID</th>
                         <th class="p-2 border border-gray-700">Player Name</th>
-                        <th class="p-2 border border-gray-700">Attendance Count</th>
+                        <th class="p-2 border border-gray-700">Attendance Dates</th>
                     </tr>
                 </thead>
                 <tbody id="historyTableBody">
@@ -99,12 +111,18 @@
         ];
 
         let attendanceRecords = [];
+        let playerAttendanceHistory = {}; // Object to track history by player
 
-        // Load attendance records from localStorage (for the current session)
+        // Load attendance records and history from localStorage
         function loadAttendanceRecords() {
             const savedAttendanceRecords = localStorage.getItem('attendanceRecords');
             if (savedAttendanceRecords) {
                 attendanceRecords = JSON.parse(savedAttendanceRecords);
+            }
+
+            const savedPlayerAttendanceHistory = localStorage.getItem('playerAttendanceHistory');
+            if (savedPlayerAttendanceHistory) {
+                playerAttendanceHistory = JSON.parse(savedPlayerAttendanceHistory);
             }
 
             displayAttendance();
@@ -129,7 +147,7 @@
         }
 
         function recordAttendance() {
-            const playerName = document.getElementById("playerName").textContent.replace("Player: ", "").replace(" (✔️)", "").replace(" (❌)", "");
+            const playerName = document.getElementById("playerName").textContent.replace("Player: ", "").replace(/ \([\s\S]+\)/, "");
             if (!playerName) {
                 alert("Please search for a player first.");
                 return;
@@ -149,16 +167,29 @@
                 date
             };
 
+            // Check for duplicate entries
+            if (attendanceRecords.some(record => record.playerId === playerId && record.date === date)) {
+                alert("Attendance for this player has already been recorded today.");
+                return;
+            }
+
             attendanceRecords.push(attendanceRecord);
             localStorage.setItem('attendanceRecords', JSON.stringify(attendanceRecords));
+
+            // Update player's attendance history
+            if (!playerAttendanceHistory[playerName]) {
+                playerAttendanceHistory[playerName] = [];
+            }
+            playerAttendanceHistory[playerName].push(date);
+            localStorage.setItem('playerAttendanceHistory', JSON.stringify(playerAttendanceHistory));
 
             displayAttendance();
             updateAttendanceHistory();
         }
 
         function displayAttendance() {
-            const tbody = document.getElementById("attendanceBody");
-            tbody.innerHTML = "";
+            const attendanceBody = document.getElementById("attendanceBody");
+            attendanceBody.innerHTML = "";
 
             attendanceRecords.forEach((record, index) => {
                 const row = document.createElement("tr");
@@ -168,44 +199,97 @@
                     <td class="p-2 border border-gray-700">${record.coach}</td>
                     <td class="p-2 border border-gray-700">${record.trainingLevel}</td>
                     <td class="p-2 border border-gray-700">${record.date}</td>
-                    <td class="p-2 border border-gray-700">
-                        <button class="remove-btn bg-red-600 hover:bg-red-500 text-white font-bold py-1 px-2 rounded" onclick="removeAttendance(${index})">Remove</button>
+                    <td class="p-2 border border-gray-700 text-center">
+                        <button onclick="deleteAttendance(${index})" class="bg-red-800 hover:bg-red-700 text-white font-bold py-1 px-2 rounded">Delete</button>
                     </td>
                 `;
-                tbody.appendChild(row);
+                attendanceBody.appendChild(row);
             });
         }
 
-        function removeAttendance(index) {
+        function deleteAttendance(index) {
+            const record = attendanceRecords[index];
+
             attendanceRecords.splice(index, 1);
             localStorage.setItem('attendanceRecords', JSON.stringify(attendanceRecords));
+
+            // Update player's attendance history
+            const playerName = record.playerName.replace(/ \([\s\S]+\)/, "");
+            const dateIndex = playerAttendanceHistory[playerName].indexOf(record.date);
+            if (dateIndex > -1) {
+                playerAttendanceHistory[playerName].splice(dateIndex, 1);
+                if (playerAttendanceHistory[playerName].length === 0) {
+                    delete playerAttendanceHistory[playerName];
+                }
+                localStorage.setItem('playerAttendanceHistory', JSON.stringify(playerAttendanceHistory));
+            }
+
             displayAttendance();
             updateAttendanceHistory();
         }
 
         function updateAttendanceHistory() {
-            const playerAttendanceCounts = {};
+            const historyBody = document.getElementById("historyTableBody");
+            historyBody.innerHTML = "";
 
-            attendanceRecords.forEach(record => {
-                if (!playerAttendanceCounts[record.playerId]) {
-                    playerAttendanceCounts[record.playerId] = { playerName: record.playerName, count: 0 };
-                }
-                playerAttendanceCounts[record.playerId].count += 1;
-            });
-
-            const tbody = document.getElementById("historyTableBody");
-            tbody.innerHTML = "";
-
-            Object.values(playerAttendanceCounts).forEach(record => {
+            for (const [playerName, dates] of Object.entries(playerAttendanceHistory)) {
                 const row = document.createElement("tr");
                 row.innerHTML = `
-                    <td class="p-2 border border-gray-700">${record.playerName}</td>
-                    <td class="p-2 border border-gray-700">${record.count}</td>
+                    <td class="p-2 border border-gray-700">${playerName}</td>
+                    <td class="p-2 border border-gray-700">${dates.join(', ')}</td>
                 `;
-                tbody.appendChild(row);
+                historyBody.appendChild(row);
+            }
+        }
+
+        function toggleHistoryTable() {
+            const historyTableContainer = document.getElementById("historyTableContainer");
+            const toggleBtn = document.getElementById("toggleHistoryBtn");
+
+            if (historyTableContainer.classList.contains("hidden")) {
+                historyTableContainer.classList.remove("hidden");
+                toggleBtn.textContent = "Hide Attendance History";
+            } else {
+                historyTableContainer.classList.add("hidden");
+                toggleBtn.textContent = "Show Attendance History";
+            }
+        }
+
+        function exportAttendanceToCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Player ID,Player Name (Paid Status),Coach,Training Level,Date\n";
+
+            attendanceRecords.forEach(record => {
+                csvContent += `${record.playerId},${record.playerName},${record.coach},${record.trainingLevel},${record.date}\n`;
             });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "attendance_records.csv");
+            document.body.appendChild(link);
+
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function exportHistoryToCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Player Name,Attendance Dates\n";
+
+            for (const [playerName, dates] of Object.entries(playerAttendanceHistory)) {
+                csvContent += `${playerName},${dates.join('; ')}\n`;
+            }
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "attendance_history.csv");
+            document.body.appendChild(link);
+
+            link.click();
+            document.body.removeChild(link);
         }
     </script>
-
 </body>
 </html>
